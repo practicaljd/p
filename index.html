@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    body {
+      outline: none;
+    }
+  </style>
+</head>
+<body tabindex="0">
+  <input id="slipBuffer" type="text" inputmode="numeric" autocomplete="off" style="position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none;">
+  <script src="./slips-data.js"></script>
+  <script src="./slip-overrides.js"></script>
+  <script>
+    const manualOverrides = [
+      {
+        match: section => /simple standalone chatting application/i.test(section.title),
+        body: `ChatServer.java:
+import java.awt.BorderLayout;
+import java.awt.event.ActionEvent;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+
+public class ChatServer extends JFrame {
+  private final JTextArea area = new JTextArea();
+  private final JTextField field = new JTextField();
+  private PrintWriter out;
+
+  public ChatServer() {
+    setTitle("Chat Server");
+    area.setEditable(false);
+    add(new JScrollPane(area), BorderLayout.CENTER);
+    JButton send = new JButton("Send");
+    send.addActionListener(this::sendMessage);
+    field.addActionListener(this::sendMessage);
+    add(field, BorderLayout.NORTH);
+    add(send, BorderLayout.SOUTH);
+    setSize(420, 320);
+    setDefaultCloseOperation(EXIT_ON_CLOSE);
+    setVisible(true);
+  }
+
+  private void sendMessage(ActionEvent event) {
+    if (out == null) {
+      return;
+    }
+    String message = field.getText().trim();
+    if (message.isEmpty()) {
+      return;
+    }
+    out.println(message);
+    append("Server: " + message);
+    field.setText("");
+  }
+
+  private void append(String text) {
+    SwingUtilities.invokeLater(() -> area.append(text + "\\n"));
+  }
+
+  private void startServer() throws Exception {
+    ServerSocket serverSocket = new ServerSocket(5000);
+    Socket socket = serverSocket.accept();
+    out = new PrintWriter(socket.getOutputStream(), true);
+    BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    new Thread(() -> {
+      try {
+        String line;
+        while ((line = in.readLine()) != null) {
+          append("Client: " + line);
+        }
+      } catch (Exception ignored) {
+      }
+    }).start();
+  }
+
+  public static void main(String[] args) throws Exception {
+    ChatServer server = new ChatServer();
+    server.startServer();
+  }
+}
+
+ChatClient.java:
+import java.awt.BorderLayout;
+import java.awt.event.ActionEvent;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+
+public class ChatClient extends JFrame {
+  private final JTextArea area = new JTextArea();
+  private final JTextField field = new JTextField();
+  private PrintWriter out;
+
+  public ChatClient() {
+    setTitle("Chat Client");
+    area.setEditable(false);
+    add(new JScrollPane(area), BorderLayout.CENTER);
+    JButton send = new JButton("Send");
+    send.addActionListener(this::sendMessage);
+    field.addActionListener(this::sendMessage);
+    add(field, BorderLayout.NORTH);
+    add(send, BorderLayout.SOUTH);
+    setSize(420, 320);
+    setDefaultCloseOperation(EXIT_ON_CLOSE);
+    setVisible(true);
+  }
+
+  private void sendMessage(ActionEvent event) {
+    if (out == null) {
+      return;
+    }
+    String message = field.getText().trim();
+    if (message.isEmpty()) {
+      return;
+    }
+    out.println(message);
+    append("Client: " + message);
+    field.setText("");
+  }
+
+  private void append(String text) {
+    SwingUtilities.invokeLater(() -> area.append(text + "\\n"));
+  }
+
+  private void startClient() throws Exception {
+    Socket socket = new Socket("localhost", 5000);
+    out = new PrintWriter(socket.getOutputStream(), true);
+    BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    new Thread(() -> {
+      try {
+        String line;
+        while ((line = in.readLine()) != null) {
+          append("Server: " + line);
+        }
+      } catch (Exception ignored) {
+      }
+    }).start();
+  }
+
+  public static void main(String[] args) throws Exception {
+    ChatClient client = new ChatClient();
+    client.startClient();
+  }
+}`
+      },
+      {
+        match: section => /login with db validation/i.test(section.title),
+        body: `LoginServlet.java:
+import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet("/login")
+public class LoginServlet extends HttpServlet {
+  @Override
+  protected void doGet(HttpServletRequest req, HttpServletResponse res) throws java.io.IOException {
+    res.setContentType("text/html");
+    PrintWriter out = res.getWriter();
+    out.println("<html><body>");
+    out.println("<form method='post'>");
+    out.println("Username: <input type='text' name='username'><br>");
+    out.println("Password: <input type='password' name='password'><br>");
+    out.println("<input type='submit' value='Login'>");
+    out.println("</form>");
+    out.println("</body></html>");
+  }
+
+  @Override
+  protected void doPost(HttpServletRequest req, HttpServletResponse res) throws java.io.IOException {
+    res.setContentType("text/html");
+    PrintWriter out = res.getWriter();
+    String username = req.getParameter("username");
+    String password = req.getParameter("password");
+    try {
+      Class.forName("com.mysql.cj.jdbc.Driver");
+      Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/college", "root", "root");
+      PreparedStatement ps = con.prepareStatement("SELECT * FROM users WHERE username=? AND password=?");
+      ps.setString(1, username);
+      ps.setString(2, password);
+      ResultSet rs = ps.executeQuery();
+      if (rs.next()) {
+        out.println("<h2>Login Successful</h2>");
+      } else {
+        out.println("<h2>Invalid Username or Password</h2>");
+      }
+      con.close();
+    } catch (Exception e) {
+      out.println("<h2>Error: " + e.getMessage() + "</h2>");
+    }
+  }
+}`
+      },
+      {
+        match: section => /employee\(eno,ename,designation,salary\)/i.test(section.title),
+        body: `DBHelper.java:
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+
+public class DBHelper extends SQLiteOpenHelper {
+  public DBHelper(Context context) {
+    super(context, "EmpDB", null, 1);
+  }
+
+  @Override
+  public void onCreate(SQLiteDatabase db) {
+    db.execSQL("CREATE TABLE Employee(Eno INTEGER PRIMARY KEY AUTOINCREMENT,Ename TEXT,Designation TEXT,Salary REAL)");
+  }
+
+  @Override
+  public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+    db.execSQL("DROP TABLE IF EXISTS Employee");
+    onCreate(db);
+  }
+
+  public long insert(String name, String designation, double salary) {
+    ContentValues cv = new ContentValues();
+    cv.put("Ename", name);
+    cv.put("Designation", designation);
+    cv.put("Salary", salary);
+    return getWritableDatabase().insert("Employee", null, cv);
+  }
+
+  public Cursor getAll() {
+    return getReadableDatabase().rawQuery("SELECT * FROM Employee", null);
+  }
+}
+
+MainActivity.java:
+import android.database.Cursor;
+import android.os.Bundle;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
+
+    DBHelper db = new DBHelper(this);
+    EditText etName = findViewById(R.id.etName);
+    EditText etDesg = findViewById(R.id.etDesg);
+    EditText etSalary = findViewById(R.id.etSalary);
+    Button btnInsert = findViewById(R.id.btnInsert);
+    Button btnShow = findViewById(R.id.btnShow);
+
+    btnInsert.setOnClickListener(v -> {
+      String name = etName.getText().toString();
+      String desg = etDesg.getText().toString();
+      double salary = Double.parseDouble(etSalary.getText().toString());
+      db.insert(name, desg, salary);
+      Toast.makeText(this, "Employee Added", Toast.LENGTH_SHORT).show();
+    });
+
+    btnShow.setOnClickListener(v -> {
+      Cursor c = db.getAll();
+      StringBuilder sb = new StringBuilder();
+      while (c.moveToNext()) {
+        sb.append(c.getInt(0)).append(" | ")
+          .append(c.getString(1)).append(" | ")
+          .append(c.getString(2)).append(" | ")
+          .append(c.getDouble(3)).append("\\n");
+      }
+      Toast.makeText(this, sb.toString(), Toast.LENGTH_LONG).show();
+    });
+  }
+}`
+      },
+      {
+        match: section => /custom listview in android application/i.test(section.title),
+        body: `item_list.xml:
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="12dp">
+
+    <ImageView
+        android:id="@+id/imgIcon"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@drawable/android_icon" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvDesc"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+</LinearLayout>
+
+MainActivity.java:
+import android.os.Bundle;
+import android.widget.ListView;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
+
+    String[][] data = {
+      {"Cupcake", "v1.5"},
+      {"Donut", "v1.6"},
+      {"Eclair", "v2.0"},
+      {"Froyo", "v2.2"},
+      {"Gingerbread", "v2.3"}
+    };
+
+    ListView listView = findViewById(R.id.listView);
+    listView.setAdapter(new VersionAdapter(this, data));
+  }
+}
+
+VersionAdapter.java:
+import android.content.Context;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+public class VersionAdapter extends ArrayAdapter<String[]> {
+  private final Context context;
+  private final String[][] data;
+
+  public VersionAdapter(Context context, String[][] data) {
+    super(context, R.layout.item_list, data);
+    this.context = context;
+    this.data = data;
+  }
+
+  @Override
+  public View getView(int position, View convertView, ViewGroup parent) {
+    View view = convertView;
+    if (view == null) {
+      view = LayoutInflater.from(context).inflate(R.layout.item_list, parent, false);
+    }
+    ImageView imgIcon = view.findViewById(R.id.imgIcon);
+    TextView tvTitle = view.findViewById(R.id.tvTitle);
+    TextView tvDesc = view.findViewById(R.id.tvDesc);
+    tvTitle.setText(data[position][0]);
+    tvDesc.setText(data[position][1]);
+    imgIcon.setImageResource(R.drawable.android_icon);
+    return view;
+  }
+}`
+      }
+    ];
+
+    const state = {
+      slips: [],
+      slipMap: new Map(),
+      activeSlipNumber: null
+    };
+
+    const slipBuffer = document.getElementById("slipBuffer");
+
+    function normalizeNewlines(text) {
+      return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    }
+
+    function parseSlips(raw) {
+      return normalizeNewlines(raw)
+        .split(/\n(?=\s*SLIP\s+\d+\s+-)/)
+        .map(chunk => chunk.trim())
+        .filter(Boolean)
+        .map(chunk => {
+          const lines = chunk.split("\n");
+          const header = lines[0].trim();
+          const headerMatch = header.match(/^SLIP\s+(\d+)\s+-\s+(.+)$/);
+          if (!headerMatch) {
+            return null;
+          }
+          const number = Number(headerMatch[1]);
+          const title = headerMatch[2].trim();
+          const sections = [];
+          for (let i = 1; i < lines.length; i += 1) {
+            const headMatch = lines[i].trim().match(/^Q([12][AB])\s+\[(\d+)M\]\s+-\s+(.+)$/);
+            if (!headMatch) {
+              continue;
+            }
+            let j = i + 1;
+            while (j < lines.length && !lines[j].trim().match(/^Q([12][AB])\s+\[(\d+)M\]\s+-\s+(.+)$/)) {
+              j += 1;
+            }
+            const blockLines = lines.slice(i + 1, j);
+            const promptIndex = blockLines.findIndex(line => line.trim().startsWith("Q:"));
+            const prompt = promptIndex >= 0 ? blockLines[promptIndex].trim().replace(/^Q:\s*/, "") : "";
+            const bodyLines = promptIndex >= 0 ? blockLines.slice(promptIndex + 1) : blockLines;
+            sections.push({
+              slipNumber: number,
+              key: `Q${headMatch[1]}`,
+              title: headMatch[3].trim(),
+              prompt,
+              body: bodyLines.join("\n").trim()
+            });
+            i = j - 1;
+          }
+          return { number, title, sections };
+        })
+        .filter(Boolean);
+    }
+
+    function getOverride(section) {
+      const entry = manualOverrides.find(item => item.match(section));
+      return entry ? entry.body.trim() : null;
+    }
+
+    function resolveBody(section) {
+      if (window.SLIP_OVERRIDES) {
+        const exactKey = `${section.slipNumber}-${section.key}`;
+        const exactOverride = window.SLIP_OVERRIDES[exactKey];
+        if (typeof exactOverride === "string" && exactOverride.trim()) {
+          return exactOverride.trim();
+        }
+      }
+      const override = getOverride(section);
+      if (override) {
+        return override;
+      }
+      const refMatch = `${section.title}\n${section.prompt}\n${section.body}`.match(/Slip\s+(\d+)\s+Q([12][AB])/i);
+      if (refMatch) {
+        const refSlip = state.slipMap.get(Number(refMatch[1]));
+        if (refSlip) {
+          const refSection = refSlip.sections.find(item => item.key.toUpperCase() === `Q${refMatch[2].toUpperCase()}`);
+          if (refSection && refSection !== section) {
+            return resolveBody(refSection);
+          }
+        }
+      }
+      return section.body.trim();
+    }
+
+    function stripComments(text) {
+      return text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .split("\n")
+        .map(line => line.replace(/\s\/\/.*$/, "").replace(/^──\s*/, "").trimEnd())
+        .filter((line, index, array) => line.trim() !== "" || (index > 0 && array[index - 1].trim() !== ""))
+        .join("\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    }
+
+    function getCopyText(section) {
+      return stripComments(resolveBody(section));
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (error) {
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.style.position = "fixed";
+        area.style.left = "-9999px";
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+        const copied = document.execCommand("copy");
+        document.body.removeChild(area);
+        return copied;
+      }
+    }
+
+    async function copySection(index) {
+      tryOpenBufferedSlip();
+      const slip = state.slipMap.get(state.activeSlipNumber);
+      if (!slip || !slip.sections[index]) {
+        return;
+      }
+      await copyText(getCopyText(slip.sections[index]));
+    }
+
+    function openSlip(number) {
+      if (state.slipMap.has(Number(number))) {
+        state.activeSlipNumber = Number(number);
+        slipBuffer.value = String(number);
+      }
+    }
+
+    function tryOpenBufferedSlip() {
+      const typedBuffer = slipBuffer.value.replace(/\D/g, "").slice(0, 3);
+      slipBuffer.value = typedBuffer;
+      if (!typedBuffer) {
+        return;
+      }
+      const exact = state.slipMap.get(Number(typedBuffer));
+      if (exact) {
+        openSlip(exact.number);
+      }
+    }
+
+    function syncBuffer() {
+      const typedBuffer = slipBuffer.value.replace(/\D/g, "").slice(0, 3);
+      slipBuffer.value = typedBuffer;
+      if (!typedBuffer) {
+        return;
+      }
+      const exact = state.slipMap.get(Number(typedBuffer));
+      if (exact) {
+        openSlip(exact.number);
+      }
+    }
+
+    function focusBuffer() {
+      slipBuffer.focus();
+      slipBuffer.select();
+    }
+
+    function bindEvents() {
+      slipBuffer.addEventListener("input", () => {
+        syncBuffer();
+      });
+
+      document.addEventListener("keydown", async event => {
+        if (event.ctrlKey && /^[1-4]$/.test(event.key)) {
+          event.preventDefault();
+          await copySection(Number(event.key) - 1);
+          return;
+        }
+
+        if (event.key === "Escape") {
+          slipBuffer.value = "";
+          return;
+        }
+
+        if (event.key === "Enter") {
+          event.preventDefault();
+          tryOpenBufferedSlip();
+          return;
+        }
+      });
+
+      document.addEventListener("click", () => focusBuffer());
+      window.addEventListener("load", () => focusBuffer());
+      window.addEventListener("focus", () => focusBuffer());
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          focusBuffer();
+        }
+      });
+      slipBuffer.addEventListener("blur", () => {
+        setTimeout(focusBuffer, 0);
+      });
+    }
+
+    function init() {
+      state.slips = parseSlips(window.SLIP_RAW || "");
+      state.slips.forEach(slip => state.slipMap.set(slip.number, slip));
+      bindEvents();
+      state.activeSlipNumber = null;
+      slipBuffer.value = "";
+      focusBuffer();
+    }
+
+    init();
+  </script>
+</body>
+</html>
