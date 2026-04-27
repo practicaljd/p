@@ -172,6 +172,9 @@ activity_detail.xml:
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.mapsdemo">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <application>
         <meta-data
             android:name="com.google.android.geo.API_KEY"
@@ -180,8 +183,13 @@ activity_detail.xml:
 </manifest>
 
 MapsActivity.java:
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentActivity;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -191,11 +199,13 @@ import com.google.android.gms.maps.model.MarkerOptions;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
   private GoogleMap gMap;
+  private FusedLocationProviderClient fusedLocationClient;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_maps);
+    fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
     SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
     if (mapFragment != null) {
       mapFragment.getMapAsync(this);
@@ -206,9 +216,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
   public void onMapReady(GoogleMap googleMap) {
     gMap = googleMap;
     gMap.setMapType(GoogleMap.MAP_TYPE_SATELLITE);
-    LatLng pune = new LatLng(18.5204, 73.8567);
-    gMap.addMarker(new MarkerOptions().position(pune).title("Current Location"));
-    gMap.moveCamera(CameraUpdateFactory.newLatLngZoom(pune, 12f));
+    if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+        != PackageManager.PERMISSION_GRANTED) {
+      ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 101);
+      return;
+    }
+    gMap.setMyLocationEnabled(true);
+    fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
+      if (location != null) {
+        LatLng current = new LatLng(location.getLatitude(), location.getLongitude());
+        gMap.addMarker(new MarkerOptions().position(current).title("Current Location"));
+        gMap.moveCamera(CameraUpdateFactory.newLatLngZoom(current, 15f));
+      }
+    });
+  }
+
+  @Override
+  public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    if (requestCode == 101 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED && gMap != null) {
+      onMapReady(gMap);
+    }
   }
 }
 
@@ -640,6 +668,8 @@ public class MainActivity extends AppCompatActivity {
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.mapszoom">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application>
         <meta-data
             android:name="com.google.android.geo.API_KEY"
@@ -982,6 +1012,8 @@ public class MainActivity extends AppCompatActivity {
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.mapsearch">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application>
         <meta-data
             android:name="com.google.android.geo.API_KEY"
@@ -1056,6 +1088,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
   }
 
   private void searchLocation() {
+    if (gMap == null) {
+      Toast.makeText(this, "Map is loading", Toast.LENGTH_SHORT).show();
+      return;
+    }
     try {
       Geocoder geocoder = new Geocoder(this, Locale.getDefault());
       List<Address> list = geocoder.getFromLocationName(etSearch.getText().toString(), 1);
@@ -1497,7 +1533,8 @@ public class ChatServer extends JFrame {
       try {
         String line;
         while ((line = in.readLine()) != null) {
-          SwingUtilities.invokeLater(() -> area.append("Client: " + line + "\\n"));
+          String received = line;
+          SwingUtilities.invokeLater(() -> area.append("Client: " + received + "\\n"));
         }
       } catch (Exception ignored) {
       }
@@ -1564,7 +1601,8 @@ public class ChatClient extends JFrame {
       try {
         String line;
         while ((line = in.readLine()) != null) {
-          SwingUtilities.invokeLater(() -> area.append("Server: " + line + "\\n"));
+          String received = line;
+          SwingUtilities.invokeLater(() -> area.append("Server: " + received + "\\n"));
         }
       } catch (Exception ignored) {
       }
@@ -1798,8 +1836,8 @@ account.jsp:
   String ano = request.getParameter("ano");
   String type = request.getParameter("type");
   String bal = request.getParameter("bal");
-  Class.forName("com.mysql.cj.jdbc.Driver");
-  Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/college", "root", "root");
+  Class.forName("org.postgresql.Driver");
+  Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
   if (ano != null && type != null && bal != null) {
     PreparedStatement ps = con.prepareStatement("INSERT INTO Account VALUES(?,?,?)");
     ps.setInt(1, Integer.parseInt(ano));
@@ -1892,8 +1930,8 @@ public class LoginServlet extends HttpServlet {
     res.setContentType("text/html");
     PrintWriter out = res.getWriter();
     try {
-      Class.forName("com.mysql.cj.jdbc.Driver");
-      Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/college", "root", "root");
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
       PreparedStatement ps = con.prepareStatement("SELECT * FROM users WHERE username=? AND password=?");
       ps.setString(1, req.getParameter("username"));
       ps.setString(2, req.getParameter("password"));
@@ -2448,6 +2486,8 @@ public class ResultActivity extends AppCompatActivity {
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.hybridmap">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application>
         <meta-data
             android:name="com.google.android.geo.API_KEY"
@@ -2753,3 +2793,1825 @@ activity_detail.xml:
 
 window.SLIP_OVERRIDES["15-Q2B"] = window.SLIP_OVERRIDES["12-Q2B"];
 window.SLIP_OVERRIDES["21-Q2B"] = window.SLIP_OVERRIDES["10-Q2B"];
+
+Object.assign(window.SLIP_OVERRIDES, {
+  "4-Q1A": `DeleteStudents.java:
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+
+public class DeleteStudents {
+  public static void main(String[] args) {
+    try {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      PreparedStatement ps = con.prepareStatement("DELETE FROM student WHERE sname LIKE ?");
+      ps.setString(1, "S%");
+      int rows = ps.executeUpdate();
+      System.out.println(rows + " record(s) deleted.");
+      con.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}`,
+
+  "4-Q1B": `InfoServlet.java:
+import java.io.IOException;
+import java.io.PrintWriter;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet("/info")
+public class InfoServlet extends HttpServlet {
+  @Override
+  protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
+    res.setContentType("text/html");
+    PrintWriter out = res.getWriter();
+    out.println("<html><body>");
+    out.println("<h2>HTTP Request Information</h2>");
+    out.println("<b>Client IP:</b> " + req.getRemoteAddr() + "<br>");
+    out.println("<b>Browser:</b> " + req.getHeader("User-Agent") + "<br>");
+    out.println("<b>OS:</b> " + System.getProperty("os.name") + "<br>");
+    out.println("<b>Server Name:</b> " + req.getServerName() + "<br>");
+    out.println("<b>Server Port:</b> " + req.getServerPort() + "<br>");
+    out.println("<b>Method:</b> " + req.getMethod() + "<br>");
+    out.println("</body></html>");
+  }
+}`,
+
+  "7-Q1A": `email.html:
+<form action="email.jsp" method="post">
+    Email: <input type="text" name="email">
+    <input type="submit" value="Validate">
+</form>
+
+email.jsp:
+<%
+String email = request.getParameter("email");
+boolean valid = email != null && email.matches("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\\\.[a-zA-Z]{2,}");
+%>
+<html>
+<body>
+<h2 style="color:<%= valid ? "green" : "red" %>;">
+    <%= valid ? "VALID Email" : "INVALID Email" %>
+</h2>
+</body>
+</html>`,
+
+  "7-Q1B": `NumberDisplay.java:
+import java.awt.FlowLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+
+public class NumberDisplay extends JFrame implements Runnable, ActionListener {
+  private final JTextField textField = new JTextField(10);
+  private final JButton button = new JButton("Start");
+
+  public NumberDisplay() {
+    setLayout(new FlowLayout());
+    add(new JLabel("Number:"));
+    add(textField);
+    add(button);
+    button.addActionListener(this);
+    setSize(300, 120);
+    setDefaultCloseOperation(EXIT_ON_CLOSE);
+    setVisible(true);
+  }
+
+  @Override
+  public void run() {
+    for (int i = 1; i <= 100; i++) {
+      final int number = i;
+      SwingUtilities.invokeLater(() -> textField.setText(String.valueOf(number)));
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+    }
+  }
+
+  @Override
+  public void actionPerformed(ActionEvent e) {
+    new Thread(this).start();
+  }
+
+  public static void main(String[] args) {
+    new NumberDisplay();
+  }
+}`,
+
+  "9-Q1A": `CreateEmp.java:
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
+
+public class CreateEmp {
+  public static void main(String[] args) {
+    try {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      Statement st = con.createStatement();
+      st.executeUpdate("CREATE TABLE IF NOT EXISTS Emp(ENo INT PRIMARY KEY, EName VARCHAR(50), Sal DOUBLE)");
+
+      PreparedStatement ps = con.prepareStatement("INSERT INTO Emp VALUES(?,?,?)");
+      ps.setInt(1, 1);
+      ps.setString(2, "Amit");
+      ps.setDouble(3, 50000);
+      ps.executeUpdate();
+
+      ps.setInt(1, 2);
+      ps.setString(2, "Seeta");
+      ps.setDouble(3, 60000);
+      ps.executeUpdate();
+
+      System.out.println("Records inserted successfully.");
+      con.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}`,
+
+  "9-Q1B": `page1.jsp:
+<%@ page session="true" %>
+<html>
+<body>
+<form action="page2.jsp" method="post">
+    Item 1 Qty: <input type="text" name="qty1" value="1"> Price: Rs.100<br>
+    Item 2 Qty: <input type="text" name="qty2" value="1"> Price: Rs.200<br>
+    <input type="submit" value="Next Page">
+</form>
+</body>
+</html>
+
+page2.jsp:
+<%@ page session="true" %>
+<%
+int qty1 = Integer.parseInt(request.getParameter("qty1"));
+int qty2 = Integer.parseInt(request.getParameter("qty2"));
+int p1Total = qty1 * 100 + qty2 * 200;
+session.setAttribute("p1Total", p1Total);
+%>
+<html>
+<body>
+<form action="bill.jsp" method="post">
+    Item 3 Qty: <input type="text" name="qty3" value="1"> Price: Rs.150<br>
+    <input type="submit" value="Show Bill">
+</form>
+</body>
+</html>
+
+bill.jsp:
+<%@ page session="true" %>
+<%
+int qty3 = Integer.parseInt(request.getParameter("qty3"));
+int p2Total = qty3 * 150;
+int p1 = (Integer) session.getAttribute("p1Total");
+int grand = p1 + p2Total;
+%>
+<html>
+<body>
+<h2>BILL</h2>
+<p>Page 1 Total: Rs.<%= p1 %></p>
+<p>Page 2 Total: Rs.<%= p2Total %></p>
+<h3>Grand Total: Rs.<%= grand %></h3>
+</body>
+</html>`,
+
+  "10-Q1A": `hibernate.cfg.xml:
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-configuration PUBLIC
+        "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+        "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
+<hibernate-configuration>
+    <session-factory>
+        <property name="connection.driver_class">org.postgresql.Driver</property>
+        <property name="connection.url">jdbc:postgresql://localhost:5432/college</property>
+        <property name="connection.username">postgres</property>
+        <property name="connection.password">postgres</property>
+        <property name="dialect">org.hibernate.dialect.PostgreSQLDialect</property>
+        <property name="show_sql">true</property>
+    </session-factory>
+</hibernate-configuration>
+
+HelloHibernate.java:
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+
+public class HelloHibernate {
+  public static void main(String[] args) {
+    SessionFactory sf = new Configuration().configure().buildSessionFactory();
+    Session session = sf.openSession();
+    System.out.println("Hello World from Hibernate!");
+    System.out.println("Connection successful: " + session.isConnected());
+    session.close();
+    sf.close();
+  }
+}`,
+
+  "10-Q1B": `ProductServlet.java:
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet("/products")
+public class ProductServlet extends HttpServlet {
+  @Override
+  protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
+    res.setContentType("text/html");
+    PrintWriter out = res.getWriter();
+    out.println("<html><body><h2>Product List</h2>");
+    out.println("<table border='1'><tr><th>ProdCode</th><th>PName</th><th>Price</th></tr>");
+    try {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      ResultSet rs = con.createStatement().executeQuery("SELECT * FROM Product");
+      while (rs.next()) {
+        out.println("<tr><td>" + rs.getString(1) + "</td><td>" + rs.getString(2) + "</td><td>" + rs.getDouble(3) + "</td></tr>");
+      }
+      con.close();
+    } catch (Exception e) {
+      out.println("<tr><td colspan='3'>" + e.getMessage() + "</td></tr>");
+    }
+    out.println("</table></body></html>");
+  }
+}`,
+
+  "11-Q1A": `ClientInfo.java:
+import java.net.InetAddress;
+
+public class ClientInfo {
+  public static void main(String[] args) {
+    try {
+      InetAddress ip = InetAddress.getLocalHost();
+      System.out.println("IP Address: " + ip.getHostAddress());
+      System.out.println("Host Name : " + ip.getHostName());
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}`,
+
+  "11-Q1B": `SalesBetweenDates.java:
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+
+public class SalesBetweenDates {
+  public static void main(String[] args) {
+    String fromDate = "2024-01-01";
+    String toDate = "2024-12-31";
+    try {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      PreparedStatement ps = con.prepareStatement(
+        "SELECT * FROM Sales WHERE sale_date BETWEEN ? AND ?"
+      );
+      ps.setString(1, fromDate);
+      ps.setString(2, toDate);
+      ResultSet rs = ps.executeQuery();
+      while (rs.next()) {
+        System.out.println(rs.getInt(1) + " " + rs.getString(2) + " " + rs.getDate(3) + " " + rs.getDouble(4));
+      }
+      con.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}`,
+
+  "12-Q1A": `CountRecords.java:
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+
+public class CountRecords {
+  public static void main(String[] args) {
+    try {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      ResultSet rs = con.createStatement().executeQuery("SELECT COUNT(*) FROM student");
+      if (rs.next()) {
+        System.out.println("Total Records: " + rs.getInt(1));
+      }
+      con.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}`,
+
+  "12-Q1B": `ThreadLifecycleDemo.java:
+public class ThreadLifecycleDemo extends Thread {
+  @Override
+  public void run() {
+    try {
+      System.out.println("Thread State inside run: " + getState());
+      Thread.sleep(1000);
+      System.out.println("Thread task completed.");
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
+    ThreadLifecycleDemo thread = new ThreadLifecycleDemo();
+    System.out.println("NEW: " + thread.getState());
+    thread.start();
+    System.out.println("RUNNABLE: " + thread.getState());
+    Thread.sleep(100);
+    System.out.println("TIMED_WAITING/RUNNABLE: " + thread.getState());
+    thread.join();
+    System.out.println("TERMINATED: " + thread.getState());
+  }
+}`,
+
+  "13-Q1A": `CurrentThreadDemo.java:
+public class CurrentThreadDemo {
+  public static void main(String[] args) {
+    Thread thread = Thread.currentThread();
+    System.out.println("Current Thread Name: " + thread.getName());
+    System.out.println("Current Thread Priority: " + thread.getPriority());
+  }
+}`,
+
+  "13-Q1B": `college.html:
+<form action="college.jsp" method="post">
+    College ID: <input type="text" name="cid"><br>
+    College Name: <input type="text" name="cname"><br>
+    Address: <input type="text" name="addr"><br>
+    <input type="submit" value="Display">
+</form>
+
+college.jsp:
+<%
+String cid = request.getParameter("cid");
+String cname = request.getParameter("cname");
+String addr = request.getParameter("addr");
+%>
+<html>
+<body>
+<table border="1">
+    <tr><th>CID</th><th>CName</th><th>Address</th></tr>
+    <tr>
+        <td><%= cid %></td>
+        <td><%= cname %></td>
+        <td><%= addr %></td>
+    </tr>
+</table>
+</body>
+</html>`,
+
+  "14-Q1A": `voter.html:
+<form action="voter.jsp" method="post">
+    Name: <input type="text" name="name"><br>
+    Age: <input type="text" name="age"><br>
+    <input type="submit" value="Check">
+</form>
+
+voter.jsp:
+<%
+String name = request.getParameter("name");
+int age = Integer.parseInt(request.getParameter("age"));
+%>
+<html>
+<body>
+<h2>
+<%= age >= 18 ? name + " is eligible for voting." : name + " is not eligible for voting." %>
+</h2>
+</body>
+</html>`,
+
+  "14-Q1B": `ListFilesByExtension.java:
+import java.io.File;
+
+public class ListFilesByExtension {
+  public static void main(String[] args) {
+    String path = "C:/Users/Public/Documents";
+    String extension = ".txt";
+    File folder = new File(path);
+    File[] files = folder.listFiles();
+    if (files == null) {
+      System.out.println("Directory not found.");
+      return;
+    }
+    for (File file : files) {
+      if (file.isFile() && file.getName().endsWith(extension)) {
+        System.out.println(file.getName());
+      }
+    }
+  }
+}`,
+
+  "15-Q1A": `AlphabetDisplay.java:
+public class AlphabetDisplay extends Thread {
+  @Override
+  public void run() {
+    try {
+      for (char ch = 'A'; ch <= 'Z'; ch++) {
+        System.out.println(ch);
+        Thread.sleep(2000);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  public static void main(String[] args) {
+    new AlphabetDisplay().start();
+  }
+}`,
+
+  "15-Q1B": `StudentEntry.java:
+import java.awt.FlowLayout;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JTextField;
+import javax.swing.JOptionPane;
+
+public class StudentEntry extends JFrame {
+  public StudentEntry() {
+    JTextField tfRoll = new JTextField(10);
+    JTextField tfName = new JTextField(10);
+    JTextField tfPer = new JTextField(10);
+    JButton btnSave = new JButton("Save");
+
+    setLayout(new FlowLayout());
+    add(new JLabel("Roll No"));
+    add(tfRoll);
+    add(new JLabel("Name"));
+    add(tfName);
+    add(new JLabel("Percentage"));
+    add(tfPer);
+    add(btnSave);
+
+    btnSave.addActionListener(e -> {
+      try {
+        Class.forName("org.postgresql.Driver");
+        Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+        PreparedStatement ps = con.prepareStatement("INSERT INTO student VALUES(?,?,?)");
+        ps.setInt(1, Integer.parseInt(tfRoll.getText()));
+        ps.setString(2, tfName.getText());
+        ps.setDouble(3, Double.parseDouble(tfPer.getText()));
+        ps.executeUpdate();
+        JOptionPane.showMessageDialog(this, "Record Saved");
+        con.close();
+      } catch (Exception ex) {
+        JOptionPane.showMessageDialog(this, ex.getMessage());
+      }
+    });
+
+    setSize(350, 200);
+    setDefaultCloseOperation(EXIT_ON_CLOSE);
+    setVisible(true);
+  }
+
+  public static void main(String[] args) {
+    new StudentEntry();
+  }
+}`,
+
+  "15-Q2A": `activity_main.xml:
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/border_bg"
+        android:gravity="center"
+        android:padding="20dp"
+        android:text="Android Layout with Border"
+        android:textSize="20sp" />
+</LinearLayout>
+
+border_bg.xml:
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#FFFFFF" />
+    <stroke
+        android:width="2dp"
+        android:color="#000000" />
+    <corners android:radius="8dp" />
+</shape>`,
+
+  "16-Q1A": `login.html:
+<form action="login.jsp" method="post">
+    Username: <input type="text" name="username"><br>
+    Password: <input type="password" name="password"><br>
+    <input type="submit" value="Login">
+</form>
+
+login.jsp:
+<%
+String username = request.getParameter("username");
+String password = request.getParameter("password");
+boolean valid = username != null && username.equals(password);
+%>
+<html>
+<body>
+<h2><%= valid ? "Login Successful" : "Invalid Login" %></h2>
+</body>
+</html>`,
+
+  "16-Q1B": `HighestPercentage.java:
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+
+public class HighestPercentage {
+  public static void main(String[] args) {
+    try {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+
+      PreparedStatement ps = con.prepareStatement("INSERT INTO student(rollno, sname, percentage) VALUES(?,?,?)");
+      ps.setInt(1, 1);
+      ps.setString(2, "Amit");
+      ps.setDouble(3, 78.5);
+      ps.executeUpdate();
+      ps.setInt(1, 2);
+      ps.setString(2, "Seeta");
+      ps.setDouble(3, 88.2);
+      ps.executeUpdate();
+
+      ResultSet rs = con.createStatement().executeQuery(
+        "SELECT * FROM student WHERE percentage = (SELECT MAX(percentage) FROM student)"
+      );
+      while (rs.next()) {
+        System.out.println("Topper: " + rs.getString("sname") + " - " + rs.getDouble("percentage"));
+      }
+      con.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}`,
+
+  "16-Q2A": `activity_main.xml:
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Line 1" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Line 2" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Line 3" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Line 4" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Line 5" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Line 6" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Line 7" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Line 8" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Line 9" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Line 10" />
+    </LinearLayout>
+</ScrollView>`,
+
+  "17-Q1A": `VowelDisplay.java:
+public class VowelDisplay extends Thread {
+  private final String text;
+
+  public VowelDisplay(String text) {
+    this.text = text;
+  }
+
+  @Override
+  public void run() {
+    try {
+      for (char ch : text.toCharArray()) {
+        if ("AEIOUaeiou".indexOf(ch) >= 0) {
+          System.out.println(ch);
+          Thread.sleep(3000);
+        }
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  public static void main(String[] args) {
+    new VowelDisplay("Information Technology").start();
+  }
+}`,
+
+  "17-Q1B": `FileServer.java:
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class FileServer {
+  public static void main(String[] args) throws Exception {
+    ServerSocket server = new ServerSocket(5000);
+    System.out.println("Server started...");
+    while (true) {
+      Socket socket = server.accept();
+      BufferedReader in = new BufferedReader(new java.io.InputStreamReader(socket.getInputStream()));
+      PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+      String fileName = in.readLine();
+      File file = new File(fileName);
+      if (!file.exists()) {
+        out.println("File Not Found");
+      } else {
+        BufferedReader reader = new BufferedReader(new FileReader(file));
+        String line;
+        while ((line = reader.readLine()) != null) {
+          out.println(line);
+        }
+        reader.close();
+      }
+      socket.close();
+    }
+  }
+}
+
+FileClient.java:
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+
+public class FileClient {
+  public static void main(String[] args) throws Exception {
+    Socket socket = new Socket("localhost", 5000);
+    BufferedReader keyboard = new BufferedReader(new InputStreamReader(System.in));
+    PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+    BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    System.out.print("Enter file name: ");
+    out.println(keyboard.readLine());
+    String line;
+    while ((line = in.readLine()) != null) {
+      System.out.println(line);
+    }
+    socket.close();
+  }
+}`,
+
+  "17-Q2A": `activity_main.xml:
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <ImageSwitcher
+        android:id="@+id/imageSwitcher"
+        android:layout_width="250dp"
+        android:layout_height="250dp" />
+
+    <Button
+        android:id="@+id/btnNext"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Next" />
+</LinearLayout>
+
+MainActivity.java:
+import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageSwitcher;
+import android.widget.ImageView;
+import android.widget.ViewSwitcher;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+  private final int[] images = {R.drawable.img1, R.drawable.img2, R.drawable.img3};
+  private int index = 0;
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
+
+    ImageSwitcher imageSwitcher = findViewById(R.id.imageSwitcher);
+    Button btnNext = findViewById(R.id.btnNext);
+
+    imageSwitcher.setFactory(new ViewSwitcher.ViewFactory() {
+      @Override
+      public View makeView() {
+        ImageView imageView = new ImageView(MainActivity.this);
+        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        imageView.setLayoutParams(new ImageSwitcher.LayoutParams(
+          ImageSwitcher.LayoutParams.MATCH_PARENT,
+          ImageSwitcher.LayoutParams.MATCH_PARENT
+        ));
+        return imageView;
+      }
+    });
+
+    imageSwitcher.setImageResource(images[index]);
+    btnNext.setOnClickListener(v -> {
+      index = (index + 1) % images.length;
+      imageSwitcher.setImageResource(images[index]);
+    });
+  }
+}`,
+
+  "17-Q2B": `activity_main.xml:
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/tvDemo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Long press here for Context Menu"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/tvResult"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingTop="16dp"
+        android:textSize="18sp" />
+</LinearLayout>
+
+MainActivity.java:
+import android.os.Bundle;
+import android.view.ContextMenu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+  private TextView tvResult;
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
+    TextView tvDemo = findViewById(R.id.tvDemo);
+    tvResult = findViewById(R.id.tvResult);
+    registerForContextMenu(tvDemo);
+  }
+
+  @Override
+  public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
+    super.onCreateContextMenu(menu, v, menuInfo);
+    menu.setHeaderTitle("Select Option");
+    menu.add(0, 1, 0, "Red");
+    menu.add(0, 2, 0, "Blue");
+    menu.add(0, 3, 0, "Green");
+  }
+
+  @Override
+  public boolean onContextItemSelected(MenuItem item) {
+    tvResult.setText("Selected: " + item.getTitle());
+    return true;
+  }
+}`,
+
+  "18-Q1A": `FactorialSleep.java:
+public class FactorialSleep extends Thread {
+  private final int number;
+
+  public FactorialSleep(int number) {
+    this.number = number;
+  }
+
+  @Override
+  public void run() {
+    long factorial = 1;
+    try {
+      for (int i = 1; i <= number; i++) {
+        factorial *= i;
+        Thread.sleep(500);
+      }
+      System.out.println("Factorial of " + number + " = " + factorial);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  public static void main(String[] args) {
+    new FactorialSleep(5).start();
+  }
+}`,
+
+  "18-Q2B": `AndroidManifest.xml:
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+</manifest>
+
+activity_main.xml:
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <Button
+        android:id="@+id/btnLocation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Get Location" />
+
+    <TextView
+        android:id="@+id/tvAddress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="16dp" />
+</LinearLayout>
+
+MainActivity.java:
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
+import android.location.Location;
+import android.location.LocationManager;
+import android.os.Bundle;
+import android.widget.Button;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import java.util.List;
+import java.util.Locale;
+
+public class MainActivity extends AppCompatActivity {
+  private TextView tvAddress;
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
+
+    Button btnLocation = findViewById(R.id.btnLocation);
+    tvAddress = findViewById(R.id.tvAddress);
+
+    btnLocation.setOnClickListener(v -> {
+      loadLocation();
+    });
+  }
+
+  private void loadLocation() {
+    if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+        != PackageManager.PERMISSION_GRANTED) {
+      ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+      return;
+    }
+    try {
+      LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+      Location location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+      if (location == null) {
+        tvAddress.setText("Location not available");
+        return;
+      }
+      Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+      List<Address> addresses = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+      if (addresses != null && !addresses.isEmpty()) {
+        Address address = addresses.get(0);
+        tvAddress.setText(
+          "Address: " + address.getAddressLine(0)
+          + "\\nCity: " + address.getLocality()
+        );
+      }
+    } catch (Exception e) {
+      tvAddress.setText(e.getMessage());
+    }
+  }
+
+  @Override
+  public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    if (requestCode == 1 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+      loadLocation();
+    }
+  }
+}`,
+
+  "19-Q1A": `greet.jsp:
+<%
+java.util.Calendar calendar = java.util.Calendar.getInstance();
+int hour = calendar.get(java.util.Calendar.HOUR_OF_DAY);
+String message;
+if (hour < 12) {
+  message = "Good Morning";
+} else if (hour < 17) {
+  message = "Good Afternoon";
+} else {
+  message = "Good Evening";
+}
+%>
+<html>
+<body>
+<h2><%= message %></h2>
+</body>
+</html>`,
+
+  "19-Q1B": `FirstStudentRecord.java:
+import java.awt.FlowLayout;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JTextField;
+
+public class FirstStudentRecord extends JFrame {
+  public FirstStudentRecord() {
+    JTextField tfRoll = new JTextField(10);
+    JTextField tfName = new JTextField(10);
+    JTextField tfPer = new JTextField(10);
+    JButton btnShow = new JButton("Show First Record");
+
+    setLayout(new FlowLayout());
+    add(new JLabel("Roll No"));
+    add(tfRoll);
+    add(new JLabel("Name"));
+    add(tfName);
+    add(new JLabel("Percentage"));
+    add(tfPer);
+    add(btnShow);
+
+    btnShow.addActionListener(e -> {
+      try {
+        Class.forName("org.postgresql.Driver");
+        Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+        ResultSet rs = con.createStatement().executeQuery("SELECT * FROM student LIMIT 1");
+        if (rs.next()) {
+          tfRoll.setText(String.valueOf(rs.getInt(1)));
+          tfName.setText(rs.getString(2));
+          tfPer.setText(String.valueOf(rs.getDouble(3)));
+        }
+        con.close();
+      } catch (Exception ex) {
+        ex.printStackTrace();
+      }
+    });
+
+    setSize(350, 200);
+    setDefaultCloseOperation(EXIT_ON_CLOSE);
+    setVisible(true);
+  }
+
+  public static void main(String[] args) {
+    new FirstStudentRecord();
+  }
+}`,
+
+  "21-Q1A": `ThreadPriorityDemo.java:
+public class ThreadPriorityDemo {
+  public static void main(String[] args) {
+    Thread t1 = new Thread(() ->
+      System.out.println("Thread Name: " + Thread.currentThread().getName() + ", Priority: " + Thread.currentThread().getPriority()),
+      "Thread-One"
+    );
+    Thread t2 = new Thread(() ->
+      System.out.println("Thread Name: " + Thread.currentThread().getName() + ", Priority: " + Thread.currentThread().getPriority()),
+      "Thread-Two"
+    );
+
+    t1.setPriority(Thread.MIN_PRIORITY);
+    t2.setPriority(Thread.MAX_PRIORITY);
+
+    t1.start();
+    t2.start();
+  }
+}`,
+
+  "21-Q1B": `StudentServlet.java:
+import java.io.IOException;
+import java.io.PrintWriter;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet("/student")
+public class StudentServlet extends HttpServlet {
+  @Override
+  protected void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
+    String name = req.getParameter("name");
+    double m1 = Double.parseDouble(req.getParameter("m1"));
+    double m2 = Double.parseDouble(req.getParameter("m2"));
+    double m3 = Double.parseDouble(req.getParameter("m3"));
+    double percentage = (m1 + m2 + m3) / 3.0;
+    String grade = percentage >= 75 ? "A" : percentage >= 60 ? "B" : percentage >= 40 ? "C" : "Fail";
+
+    res.setContentType("text/html");
+    PrintWriter out = res.getWriter();
+    out.println("<html><body>");
+    out.println("<h2>Student Result</h2>");
+    out.println("Name: " + name + "<br>");
+    out.println("Percentage: " + percentage + "<br>");
+    out.println("Grade: " + grade);
+    out.println("</body></html>");
+  }
+}`,
+
+  "22-Q1A": `DateTimeServer.java:
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Date;
+
+public class DateTimeServer {
+  public static void main(String[] args) throws Exception {
+    ServerSocket server = new ServerSocket(5000);
+    System.out.println("Server started...");
+    while (true) {
+      Socket socket = server.accept();
+      PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+      out.println("Server Date and Time: " + new Date());
+      socket.close();
+    }
+  }
+}
+
+DateTimeClient.java:
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.Socket;
+
+public class DateTimeClient {
+  public static void main(String[] args) throws Exception {
+    Socket socket = new Socket("localhost", 5000);
+    BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    System.out.println(in.readLine());
+    socket.close();
+  }
+}`,
+
+  "22-Q2A": `activity_main.xml:
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/etName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter Name" />
+
+    <Button
+        android:id="@+id/btnGreet"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Greet" />
+
+    <TextView
+        android:id="@+id/tvGreeting"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingTop="16dp"
+        android:textSize="20sp" />
+</LinearLayout>
+
+MainActivity.java:
+import android.os.Bundle;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+import java.util.Calendar;
+
+public class MainActivity extends AppCompatActivity {
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
+
+    EditText etName = findViewById(R.id.etName);
+    Button btnGreet = findViewById(R.id.btnGreet);
+    TextView tvGreeting = findViewById(R.id.tvGreeting);
+
+    btnGreet.setOnClickListener(v -> {
+      int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+      String prefix = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
+      tvGreeting.setText(prefix + ", " + etName.getText().toString());
+    });
+  }
+}`,
+
+  "23-Q1A": `CollegeTable.java:
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.util.Vector;
+import javax.swing.JFrame;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.table.DefaultTableModel;
+
+public class CollegeTable extends JFrame {
+  public CollegeTable() {
+    Vector<String> columns = new Vector<>();
+    columns.add("CID");
+    columns.add("CName");
+    columns.add("Address");
+
+    Vector<Vector<Object>> data = new Vector<>();
+    try {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      ResultSet rs = con.createStatement().executeQuery("SELECT * FROM College");
+      while (rs.next()) {
+        Vector<Object> row = new Vector<>();
+        row.add(rs.getInt(1));
+        row.add(rs.getString(2));
+        row.add(rs.getString(3));
+        data.add(row);
+      }
+      con.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    JTable table = new JTable(new DefaultTableModel(data, columns));
+    add(new JScrollPane(table));
+    setSize(500, 300);
+    setDefaultCloseOperation(EXIT_ON_CLOSE);
+    setVisible(true);
+  }
+
+  public static void main(String[] args) {
+    new CollegeTable();
+  }
+}`,
+
+  "24-Q1A": `number.html:
+<form action="number.jsp" method="post">
+    Enter Number: <input type="text" name="num">
+    <input type="submit" value="Convert">
+</form>
+
+number.jsp:
+<%
+String[] words = {"Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"};
+String num = request.getParameter("num");
+StringBuilder output = new StringBuilder();
+for (int i = 0; i < num.length(); i++) {
+  output.append(words[num.charAt(i) - '0']).append(" ");
+}
+%>
+<html>
+<body>
+<h2 style="color:red"><%= output.toString().trim() %></h2>
+</body>
+</html>`,
+
+  "24-Q1B": `CrudMenu.java:
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.Scanner;
+
+public class CrudMenu {
+  public static void main(String[] args) {
+    try (Scanner sc = new Scanner(System.in)) {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      while (true) {
+        System.out.println("1.Insert 2.Update 3.Delete 4.Search 5.Display 6.Exit");
+        int choice = sc.nextInt();
+        if (choice == 6) {
+          break;
+        }
+        switch (choice) {
+          case 1:
+            PreparedStatement ps1 = con.prepareStatement("INSERT INTO student VALUES(?,?,?)");
+            System.out.print("Roll No: ");
+            ps1.setInt(1, sc.nextInt());
+            System.out.print("Name: ");
+            ps1.setString(2, sc.next());
+            System.out.print("Percentage: ");
+            ps1.setDouble(3, sc.nextDouble());
+            ps1.executeUpdate();
+            break;
+          case 2:
+            PreparedStatement ps2 = con.prepareStatement("UPDATE student SET sname=?, percentage=? WHERE rollno=?");
+            System.out.print("New Name: ");
+            ps2.setString(1, sc.next());
+            System.out.print("New Percentage: ");
+            ps2.setDouble(2, sc.nextDouble());
+            System.out.print("Roll No: ");
+            ps2.setInt(3, sc.nextInt());
+            ps2.executeUpdate();
+            break;
+          case 3:
+            PreparedStatement ps3 = con.prepareStatement("DELETE FROM student WHERE rollno=?");
+            System.out.print("Roll No: ");
+            ps3.setInt(1, sc.nextInt());
+            ps3.executeUpdate();
+            break;
+          case 4:
+            PreparedStatement ps4 = con.prepareStatement("SELECT * FROM student WHERE rollno=?");
+            System.out.print("Roll No: ");
+            ps4.setInt(1, sc.nextInt());
+            ResultSet rs1 = ps4.executeQuery();
+            while (rs1.next()) {
+              System.out.println(rs1.getInt(1) + " " + rs1.getString(2) + " " + rs1.getDouble(3));
+            }
+            break;
+          case 5:
+            Statement st = con.createStatement();
+            ResultSet rs2 = st.executeQuery("SELECT * FROM student");
+            while (rs2.next()) {
+              System.out.println(rs2.getInt(1) + " " + rs2.getString(2) + " " + rs2.getDouble(3));
+            }
+            break;
+          default:
+            System.out.println("Invalid choice");
+        }
+      }
+      con.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}`,
+
+  "25-Q1A": `FactorServer.java:
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class FactorServer {
+  public static void main(String[] args) throws Exception {
+    ServerSocket server = new ServerSocket(5000);
+    Socket socket = server.accept();
+    BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+    int number = Integer.parseInt(in.readLine());
+    StringBuilder factors = new StringBuilder();
+    for (int i = 1; i <= number; i++) {
+      if (number % i == 0) {
+        factors.append(i).append(" ");
+      }
+    }
+    out.println("Factors: " + factors.toString().trim());
+    socket.close();
+    server.close();
+  }
+}
+
+FactorClient.java:
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+
+public class FactorClient {
+  public static void main(String[] args) throws Exception {
+    Socket socket = new Socket("localhost", 5000);
+    BufferedReader keyboard = new BufferedReader(new InputStreamReader(System.in));
+    BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+    System.out.print("Enter number: ");
+    out.println(keyboard.readLine());
+    System.out.println(in.readLine());
+    socket.close();
+  }
+}`,
+
+  "25-Q1B": `DDLFrame.java:
+import java.awt.FlowLayout;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+
+public class DDLFrame extends JFrame {
+  public DDLFrame() {
+    JButton btnCreate = new JButton("Create");
+    JButton btnAlter = new JButton("Alter");
+    JButton btnDrop = new JButton("Drop");
+
+    setLayout(new FlowLayout());
+    add(btnCreate);
+    add(btnAlter);
+    add(btnDrop);
+
+    btnCreate.addActionListener(e -> executeDDL("CREATE TABLE Employee(id INT PRIMARY KEY, name VARCHAR(50))"));
+    btnAlter.addActionListener(e -> executeDDL("ALTER TABLE Employee ADD salary DOUBLE"));
+    btnDrop.addActionListener(e -> executeDDL("DROP TABLE Employee"));
+
+    setSize(300, 120);
+    setDefaultCloseOperation(EXIT_ON_CLOSE);
+    setVisible(true);
+  }
+
+  private void executeDDL(String sql) {
+    try {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      Statement st = con.createStatement();
+      st.executeUpdate(sql);
+      JOptionPane.showMessageDialog(this, "Operation successful");
+      con.close();
+    } catch (Exception e) {
+      JOptionPane.showMessageDialog(this, e.getMessage());
+    }
+  }
+
+  public static void main(String[] args) {
+    new DDLFrame();
+  }
+}`,
+
+  "26-Q1A": `CollegeNames.java:
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+
+public class CollegeNames {
+  public static void main(String[] args) {
+    try {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      ResultSet rs = con.createStatement().executeQuery("SELECT CName FROM College");
+      while (rs.next()) {
+        System.out.println(rs.getString("CName"));
+      }
+      con.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}`,
+
+  "26-Q1B": `HobbyServlet.java:
+import java.io.IOException;
+import java.io.PrintWriter;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet("/hobby")
+public class HobbyServlet extends HttpServlet {
+  @Override
+  protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
+    res.setContentType("text/html");
+    PrintWriter out = res.getWriter();
+    out.println("<html><body><form method='post'>");
+    out.println("<input type='radio' name='hobby' value='Painting'> Painting<br>");
+    out.println("<input type='radio' name='hobby' value='Drawing'> Drawing<br>");
+    out.println("<input type='radio' name='hobby' value='Singing'> Singing<br>");
+    out.println("<input type='radio' name='hobby' value='Swimming'> Swimming<br>");
+    out.println("<input type='submit' value='Submit'>");
+    out.println("</form></body></html>");
+  }
+
+  @Override
+  protected void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
+    res.setContentType("text/html");
+    PrintWriter out = res.getWriter();
+    String hobby = req.getParameter("hobby");
+    boolean exists = false;
+    Cookie[] cookies = req.getCookies();
+    if (cookies != null) {
+      for (Cookie cookie : cookies) {
+        if ("hobby".equals(cookie.getName()) && hobby.equals(cookie.getValue())) {
+          exists = true;
+          break;
+        }
+      }
+    }
+    if (!exists) {
+      Cookie cookie = new Cookie("hobby", hobby);
+      cookie.setMaxAge(86400);
+      res.addCookie(cookie);
+      out.println("<h2>Hobby saved successfully.</h2>");
+    } else {
+      out.println("<h2>Duplicate hobby not allowed.</h2>");
+    }
+  }
+}`,
+
+  "27-Q1A": `teacher.html:
+<form action="teacher.jsp" method="post">
+    TID: <input type="text" name="tid"><br>
+    TName: <input type="text" name="tname"><br>
+    Designation: <input type="text" name="desg"><br>
+    Subject: <input type="text" name="subject"><br>
+    Qualification: <input type="text" name="qual"><br>
+    <input type="submit" value="Display">
+</form>
+
+teacher.jsp:
+<%
+String tid = request.getParameter("tid");
+String tname = request.getParameter("tname");
+String desg = request.getParameter("desg");
+String subject = request.getParameter("subject");
+String qual = request.getParameter("qual");
+%>
+<html>
+<body>
+<h2>Teacher Details</h2>
+<table border="1">
+    <tr><th>TID</th><th>TName</th><th>Designation</th><th>Subject</th><th>Qualification</th></tr>
+    <tr>
+        <td><%= tid %></td>
+        <td><%= tname %></td>
+        <td><%= desg %></td>
+        <td><%= subject %></td>
+        <td><%= qual %></td>
+    </tr>
+</table>
+</body>
+</html>`,
+
+  "27-Q1B": `ScrollRS.java:
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+
+public class ScrollRS {
+  public static void main(String[] args) {
+    try {
+      Class.forName("org.postgresql.Driver");
+      Connection con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      Statement st = con.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+      ResultSet rs = st.executeQuery("SELECT * FROM Teacher");
+
+      if (rs.first()) {
+        System.out.println("First: " + rs.getString("TName"));
+      }
+      if (rs.last()) {
+        System.out.println("Last: " + rs.getString("TName"));
+      }
+      if (rs.previous()) {
+        System.out.println("Previous: " + rs.getString("TName"));
+      }
+      if (rs.absolute(2)) {
+        System.out.println("Row 2: " + rs.getString("TName"));
+      }
+      con.close();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+}`,
+
+  "27-Q2B": `activity_main.xml:
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/etNum"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter Number"
+        android:inputType="number" />
+
+    <TextView
+        android:id="@+id/tvResult"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="16dp"
+        android:textSize="18sp" />
+</LinearLayout>
+
+MainActivity.java:
+import android.os.Bundle;
+import android.view.ContextMenu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+  private EditText etNum;
+  private TextView tvResult;
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
+    etNum = findViewById(R.id.etNum);
+    tvResult = findViewById(R.id.tvResult);
+    registerForContextMenu(etNum);
+  }
+
+  @Override
+  public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
+    super.onCreateContextMenu(menu, v, menuInfo);
+    menu.setHeaderTitle("Select Operation");
+    menu.add(0, 1, 0, "Factorial");
+    menu.add(0, 2, 0, "Sum of Digits");
+  }
+
+  @Override
+  public boolean onContextItemSelected(MenuItem item) {
+    int n = Integer.parseInt(etNum.getText().toString());
+    if (item.getItemId() == 1) {
+      long fact = 1;
+      for (int i = 2; i <= n; i++) {
+        fact *= i;
+      }
+      tvResult.setText("Factorial of " + n + " = " + fact);
+    } else {
+      int sum = 0;
+      int temp = n;
+      while (temp > 0) {
+        sum += temp % 10;
+        temp /= 10;
+      }
+      tvResult.setText("Sum of Digits of " + n + " = " + sum);
+    }
+    return true;
+  }
+}`,
+
+  "28-Q1A": `SyncDemo.java:
+public class SyncDemo {
+  static class Counter {
+    private int count = 0;
+
+    synchronized void increment() {
+      count++;
+    }
+  }
+
+  public static void main(String[] args) throws Exception {
+    Counter counter = new Counter();
+    Thread t1 = new Thread(() -> {
+      for (int i = 0; i < 1000; i++) {
+        counter.increment();
+      }
+    });
+    Thread t2 = new Thread(() -> {
+      for (int i = 0; i < 1000; i++) {
+        counter.increment();
+      }
+    });
+    t1.start();
+    t2.start();
+    t1.join();
+    t2.join();
+    System.out.println("Count: " + counter.count);
+  }
+}`,
+
+  "28-Q1B": `EmpChoice.java:
+import java.awt.BorderLayout;
+import java.awt.Choice;
+import java.awt.Panel;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.Arrays;
+import java.util.Vector;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.table.DefaultTableModel;
+
+public class EmpChoice extends JFrame implements ItemListener {
+  private final Choice choice = new Choice();
+  private final DefaultTableModel model;
+  private Connection con;
+
+  public EmpChoice() {
+    model = new DefaultTableModel(new Vector<>(), new Vector<>(Arrays.asList("ENo", "EName", "Salary")));
+    JTable table = new JTable(model);
+    try {
+      Class.forName("org.postgresql.Driver");
+      con = DriverManager.getConnection("jdbc:postgresql://localhost:5432/college", "postgres", "postgres");
+      ResultSet rs = con.createStatement().executeQuery("SELECT ENo FROM Emp");
+      choice.add("-- Select EmpNo --");
+      while (rs.next()) {
+        choice.add(rs.getString("ENo"));
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    choice.addItemListener(this);
+
+    Panel panel = new Panel();
+    panel.add(new JLabel("Select EmpNo"));
+    panel.add(choice);
+    add(panel, BorderLayout.NORTH);
+    add(new JScrollPane(table), BorderLayout.CENTER);
+    setSize(450, 300);
+    setDefaultCloseOperation(EXIT_ON_CLOSE);
+    setVisible(true);
+  }
+
+  @Override
+  public void itemStateChanged(ItemEvent e) {
+    if ("-- Select EmpNo --".equals(choice.getSelectedItem())) {
+      return;
+    }
+    try {
+      PreparedStatement ps = con.prepareStatement("SELECT * FROM Emp WHERE ENo = ?");
+      ps.setString(1, choice.getSelectedItem());
+      ResultSet rs = ps.executeQuery();
+      model.setRowCount(0);
+      if (rs.next()) {
+        model.addRow(new Object[]{rs.getInt("ENo"), rs.getString("EName"), rs.getDouble("Sal")});
+      }
+    } catch (Exception ex) {
+      ex.printStackTrace();
+    }
+  }
+
+  public static void main(String[] args) {
+    new EmpChoice();
+  }
+}`,
+
+  "29-Q1A": `OddPrime.java:
+public class OddPrime {
+  static boolean isPrime(int n) {
+    if (n < 2) {
+      return false;
+    }
+    for (int i = 2; i * i <= n; i++) {
+      if (n % i == 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public static void main(String[] args) throws Exception {
+    int n = 20;
+    Thread odd = new Thread(() -> {
+      StringBuilder sb = new StringBuilder("Odd: ");
+      for (int i = 1; i <= n; i += 2) {
+        sb.append(i).append(" ");
+      }
+      System.out.println(sb.toString().trim());
+    });
+
+    Thread prime = new Thread(() -> {
+      StringBuilder sb = new StringBuilder("Prime: ");
+      for (int i = 2; i <= n; i++) {
+        if (isPrime(i)) {
+          sb.append(i).append(" ");
+        }
+      }
+      System.out.println(sb.toString().trim());
+    });
+
+    odd.start();
+    prime.start();
+    odd.join();
+    prime.join();
+  }
+}`,
+
+  "29-Q1B": `SessionServlet.java:
+import java.io.IOException;
+import java.io.PrintWriter;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+@WebServlet("/session")
+public class SessionServlet extends HttpServlet {
+  @Override
+  protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
+    res.setContentType("text/html");
+    PrintWriter out = res.getWriter();
+    HttpSession session = req.getSession(true);
+    session.setMaxInactiveInterval(120);
+    Integer count = (Integer) session.getAttribute("count");
+    if (count == null) {
+      count = 0;
+    }
+    count++;
+    session.setAttribute("count", count);
+    out.println("Session ID: " + session.getId() + "<br>");
+    out.println("Max Inactive Interval: " + session.getMaxInactiveInterval() + " seconds<br>");
+    out.println("Visit Count: " + count);
+  }
+}`,
+
+  "29-Q2B": `activity_main.xml:
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/etInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter text or number" />
+
+    <TextView
+        android:id="@+id/tvResult"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="16dp"
+        android:textSize="18sp" />
+</LinearLayout>
+
+MainActivity.java:
+import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.widget.EditText;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+  private EditText etInput;
+  private TextView tvResult;
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_main);
+    etInput = findViewById(R.id.etInput);
+    tvResult = findViewById(R.id.tvResult);
+  }
+
+  @Override
+  public boolean onCreateOptionsMenu(Menu menu) {
+    menu.add(0, 1, 0, "Palindrome");
+    menu.add(0, 2, 0, "Reverse");
+    menu.add(0, 3, 0, "Reverse of Number");
+    return true;
+  }
+
+  @Override
+  public boolean onOptionsItemSelected(MenuItem item) {
+    String text = etInput.getText().toString();
+    String reversed = new StringBuilder(text).reverse().toString();
+    if (item.getItemId() == 1) {
+      tvResult.setText(text.equals(reversed) ? text + " is a Palindrome" : text + " is not a Palindrome");
+    } else if (item.getItemId() == 2) {
+      tvResult.setText("Reverse: " + reversed);
+    } else {
+      int n = Integer.parseInt(text);
+      int revNum = 0;
+      while (n > 0) {
+        revNum = revNum * 10 + n % 10;
+        n /= 10;
+      }
+      tvResult.setText("Reverse of Number: " + revNum);
+    }
+    return true;
+  }
+}`
+});
+
